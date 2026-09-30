@@ -71,6 +71,7 @@ Toda respuesta incluye `X-Request-Id`.
 - **La IA no escribe el contenido**: las dosis salen del fragmentador (`src/services/chunker.ts`); la IA solo aporta
   título, categoría, resumen, título de cada dosis y quiz, validados con zod (un reintento de reparación y, si falla,
   degradación con `warnings: ["AI_ENRICHMENT_DEGRADED"]` y cuota devuelta).
+- **Despliegue**: ver `DEPLOY.md` (comparativa de hostings y pasos para Render).
 - **Rate limit en memoria** (por usuario y por IP): válido **solo con una instancia** del servidor. Con varias
   instancias cada una tendría su propio contador.
 - **IP del cliente**: último valor de `X-Forwarded-For` (lo añade el proxy más cercano) o la IP del socket.

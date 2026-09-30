@@ -1,0 +1,38 @@
+# Blueprint de Render (https://render.com/docs/blueprint-spec). Node nativo, sin Docker.
+# Los secretos NO están aquí: se cargan en el panel de Render (sync: false).
+services:
+  - type: web
+    name: focusread-api
+    runtime: node
+    plan: free
+    branch: rediseno
+    autoDeployTrigger: commit
+    # NODE_ENV=production haría que `npm ci` omita typescript; por eso --include=dev en el build.
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: "24"
+      - key: NODE_ENV
+        value: production
+      - key: DATA_MODE
+        value: live
+      - key: DEV_AUTH_BYPASS
+        value: "false"
+      - key: LOG_LEVEL
+        value: info
+      - key: DEFAULT_AI_PROVIDER
+        value: deepseek
+      - key: DEFAULT_AI_MODEL
+        value: deepseek-flash
+      - key: FREE_DAILY_QUOTA
+        value: "10"
+      - key: RATE_LIMIT_PER_MINUTE
+        value: "10"
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: DEEPSEEK_API_KEY
+        sync: false

@@ -25,6 +25,8 @@ Estados: 🔴 abierto · 🟡 en espera de un hito · 🟢 cerrado.
 | D14 | B5/B6 | `QuotaStore` tiene un método extra `usage()`. En live se implementa con `consume_ai_quota(límite 1)` (+ `refund` si llegó a consumir). | `GET /v1/usage` necesita el consumo, y el contrato SQL (§3.5) solo trae `consume` y `refund`. Con límite 0 la función devuelve siempre `used=0`, por eso no sirve. | Sustituir por una función de lectura: ver P10. | 🟡 apaño temporal |
 | D15 | B5 | Al crear el artículo, `aiProvider` guarda el proveedor real (p. ej. `deepseek`), no el alias `focusread`. | Es más informativo y el contrato lo permite (`string`). | Nada. | 🟢 |
 
+| D16 | B8 | Hosting elegido: **Render** (plan gratuito, Node nativo). `Dockerfile` incluido como alternativa, sin construir. | Mejor relación simplicidad/coste hoy; ver `DEPLOY.md` para la comparativa verificada. Una sola instancia cumple P4. | Nada. | 🟢 |
+
 ## Pendientes y riesgos
 
 | # | Fase | Pendiente | Qué se necesita | Quién | Estado |
@@ -39,6 +41,9 @@ Estados: 🔴 abierto · 🟡 en espera de un hito · 🟢 cerrado.
 | P14 | B6 | La base crea 3 artículos `demo` al registrar un usuario (lo hace el esquema, no el backend). | Nada; solo saberlo al contar filas. | — | 🟢 informativo |
 | P11 | B5/B7 | Artículos largos por URL. | Resuelto en B7 (decisión de David): se recortan a 50 000 caracteres en el último párrafo y a 20 dosis. El texto pegado por el usuario se sigue rechazando. **El aviso no es posible sin cambiar el contrato** (ver C1). | — | 🟢 |
 | P12 | B5/B7 | Timeout global (90 s) vs. dos llamadas de IA de 60 s. | Resuelto en B7: plazo total de 80 s compartido por la llamada y su reintento (la reparación hereda solo el tiempo restante). Esto destapó un bug real: `AbortSignal.timeout` exige entero. | — | 🟢 |
+| P17 | B8 | **El despliegue real lo tiene que hacer David**: requiere su cuenta de Render y cargar 3 secretos en el panel; yo no tengo acceso a su cuenta. Todo está preparado (`render.yaml`, `DEPLOY.md`) y verificado en local con el build de producción. | Seguir `DEPLOY.md` (≈10 min) y pasarme la URL HTTPS para cerrar B8 (verificar `/health`, el flujo desde la app y los logs del hosting). | David | 🔴 |
+| P18 | B8 | El `Dockerfile` no se pudo construir (no hay Docker en el equipo). | Probarlo en el primer despliegue con Docker (Northflank/Cloud Run) o instalar Docker Desktop. No se necesita para Render. | David / Claude | 🟡 solo si se usa Docker |
+| P19 | B8 | Render gratis: duerme a los 15 min y despierta en ≈1 min. RAM/CPU del plan gratuito no verificados en la documentación. | En la app, llamar a `/health` al abrir (frontend) o usar un ping externo; o pasar a Northflank (siempre encendido). | David / agente frontend | 🟡 |
 | P15 | B7 | El apagado ordenado (SIGTERM) está implementado pero **no se pudo probar en Windows** (allí `kill` termina el proceso sin ejecutar el handler). | Probar en el hosting de Linux (B8): enviar SIGTERM al contenedor y comprobar el log `shutting down`. | Claude en B8 | 🟡 B8 |
 | P16 | B7 | En producción, `X-AI-Key` solo debería viajar por HTTPS: lo garantiza el hosting, el backend no lo fuerza. | Confirmar en B8 que el hosting fuerza HTTPS (redirección o bloqueo de HTTP). | Claude en B8 | 🟡 B8 |
 
