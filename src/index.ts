@@ -29,10 +29,25 @@ const server = serve({ fetch: app.fetch, port: env.PORT }, (info) => {
   logger.info({ port: info.port, mode: env.DATA_MODE }, 'server listening');
 });
 
+// Apagado ordenado: deja de aceptar conexiones, espera a las peticiones en curso y sale.
+let shuttingDown = false;
 const shutdown = (signal: string) => {
+  if (shuttingDown) return;
+  shuttingDown = true;
   logger.info({ signal }, 'shutting down');
   server.close(() => process.exit(0));
+  (server as { closeIdleConnections?: () => void }).closeIdleConnections?.();
   setTimeout(() => process.exit(1), 10_000).unref();
 };
 process.on('SIGTERM', () => shutdown('SIGTERM'));
 process.on('SIGINT', () => shutdown('SIGINT'));
+
+// Node imprime por defecto el mensaje del error al fallar; ese mensaje podría contener una key. Se registra solo el nombre.
+process.on('uncaughtException', (err) => {
+  logger.fatal({ err: { name: err.name } }, 'uncaughtException');
+  process.exit(1);
+});
+process.on('unhandledRejection', (reason) => {
+  logger.fatal({ err: { name: reason instanceof Error ? reason.name : 'unknown' } }, 'unhandledRejection');
+  process.exit(1);
+});

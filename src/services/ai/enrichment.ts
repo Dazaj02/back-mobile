@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { AppError } from '../../lib/errors.js';
 import type { AIProvider } from './AIProvider.js';
 
 const EnrichedQuizSchema = z
@@ -68,17 +69,24 @@ export async function enrich(opts: {
   model: string;
   apiKey: string;
   timeoutMs: number;
+  /** Plazo total para las dos llamadas (original + reparación). Por defecto, sin límite adicional. */
+  totalTimeoutMs?: number;
   fallbackTitle?: string;
 }): Promise<EnrichmentResult> {
-  const call = (repair?: { previous: string; error: string }) =>
-    opts.provider.enrich({
+  const started = performance.now();
+  const call = (repair?: { previous: string; error: string }) => {
+    const remaining = (opts.totalTimeoutMs ?? Infinity) - (performance.now() - started);
+    if (remaining <= 0) throw new AppError('PROVIDER_TIMEOUT', 'El proveedor de IA tardó demasiado en responder');
+    return opts.provider.enrich({
       chunks: opts.chunks,
       includeQuiz: opts.includeQuiz,
       model: opts.model,
       apiKey: opts.apiKey,
-      signal: AbortSignal.timeout(opts.timeoutMs),
+      // AbortSignal.timeout exige un entero.
+      signal: AbortSignal.timeout(Math.max(1, Math.floor(Math.min(opts.timeoutMs, remaining)))),
       ...(repair && { repair }),
     });
+  };
 
   const raw1 = await call();
   const first = validate(raw1, opts.chunks.length, opts.includeQuiz);

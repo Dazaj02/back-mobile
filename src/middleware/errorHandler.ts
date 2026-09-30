@@ -4,6 +4,17 @@ import type { Logger } from 'pino';
 import { AppError, ERROR_STATUS, type ErrorCode } from '../lib/errors.js';
 import type { AppVariables } from './requestId.js';
 
+/**
+ * El stack de JS empieza con "Name: message", y el mensaje podría contener una key o datos del proveedor.
+ * Se conservan solo las líneas de frames ("at ...").
+ */
+export function safeStack(err: Error): string {
+  return (err.stack ?? '')
+    .split('\n')
+    .filter((l) => l.trim().startsWith('at '))
+    .join('\n');
+}
+
 export function createErrorHandler(logger: Logger, isProduction: boolean): ErrorHandler<{ Variables: AppVariables }> {
   return (err, c) => {
     const requestId = c.get('requestId');
@@ -22,7 +33,7 @@ export function createErrorHandler(logger: Logger, isProduction: boolean): Error
       message = 'La petición tardó demasiado';
     } else {
       logger.error(
-        { requestId, err: isProduction ? { name: err.name } : { name: err.name, stack: err.stack } },
+        { requestId, err: isProduction ? { name: err.name } : { name: err.name, stack: safeStack(err) } },
         'unhandled error',
       );
     }

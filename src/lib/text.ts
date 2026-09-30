@@ -5,6 +5,21 @@ export function countWords(text: string): number {
 }
 
 /**
+ * Recorta a `maxChars` en el último límite de párrafo (o de oración si no hay párrafos útiles),
+ * para no cortar una frase por la mitad.
+ */
+export function truncateAtBoundary(text: string, maxChars: number): string {
+  if (text.length <= maxChars) return text;
+  const head = text.slice(0, maxChars);
+  const minKeep = Math.floor(maxChars * 0.5);
+  const paragraph = head.lastIndexOf('\n\n');
+  if (paragraph >= minKeep) return head.slice(0, paragraph).trimEnd();
+  const sentence = Math.max(...['. ', '! ', '? ', '… '].map((s) => head.lastIndexOf(s)));
+  if (sentence >= minKeep) return head.slice(0, sentence + 1).trimEnd();
+  return head.trimEnd();
+}
+
+/**
  * Normaliza: quita caracteres de control, colapsa espacios y conserva
  * los saltos de párrafo (una o más líneas en blanco → "\n\n").
  */

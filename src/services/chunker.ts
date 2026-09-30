@@ -39,6 +39,19 @@ function splitSentences(paragraph: string): string[] {
  * Fragmentación determinista (sección 3.4 del plan). La IA nunca toca este texto.
  */
 export function chunkText(input: string, targetDoseMinutes: number, wordsPerMinute = 180): Chunk[] {
+  return chunkTextDetailed(input, targetDoseMinutes, wordsPerMinute).chunks;
+}
+
+/**
+ * Igual que chunkText, pero con `truncate: true` se queda con las primeras 20 dosis en vez de fallar
+ * con CONTENT_TOO_LONG (se usa con textos extraídos de URLs, que no controla el usuario).
+ */
+export function chunkTextDetailed(
+  input: string,
+  targetDoseMinutes: number,
+  wordsPerMinute = 180,
+  opts: { truncate?: boolean } = {},
+): { chunks: Chunk[]; truncated: boolean } {
   const targetWords = targetDoseMinutes * wordsPerMinute;
   const minFill = 0.85 * targetWords;
   const maxFill = 1.3 * targetWords;
@@ -78,17 +91,23 @@ export function chunkText(input: string, targetDoseMinutes: number, wordsPerMinu
     groups.splice(-2, 2, { text: `${prev.text}\n\n${last.text}`, words: prev.words + last.words });
   }
 
+  let truncated = false;
   if (groups.length > MAX_DOSES) {
-    throw new AppError(
-      'CONTENT_TOO_LONG',
-      'El texto es demasiado largo para esa duración; elige dosis de mayor duración o un texto más corto',
-    );
+    if (!opts.truncate) {
+      throw new AppError(
+        'CONTENT_TOO_LONG',
+        'El texto es demasiado largo para esa duración; elige dosis de mayor duración o un texto más corto',
+      );
+    }
+    groups.length = MAX_DOSES;
+    truncated = true;
   }
 
-  return groups.map((g) => ({
+  const chunks = groups.map((g) => ({
     content: g.text,
     words: g.words,
     // El contrato exige estMinutes > 0: un fragmento diminuto no puede redondear a 0.
     estMinutes: Math.max(0.1, round1(g.words / wordsPerMinute)),
   }));
+  return { chunks, truncated };
 }
