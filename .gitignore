@@ -1,0 +1,17 @@
+node_modules/
+.expo/
+dist/
+web-build/
+android/
+ios/
+coverage/
+*.keystore
+*.jks
+*.p8
+*.p12
+*.pem
+.env
+.env.*
+!.env.example
+npm-debug.log*
+.DS_Store
