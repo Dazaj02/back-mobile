@@ -17,7 +17,14 @@ if (env.NODE_ENV === 'development' && env.DEV_AUTH_BYPASS) {
   logger.warn('DEV_AUTH_BYPASS activo: cualquier "Bearer dev-<uuid>" es aceptado. Solo para desarrollo.');
 }
 
-const app = createApp(env, logger);
+let app: ReturnType<typeof createApp>;
+try {
+  app = createApp(env, logger);
+} catch (err) {
+  logger.fatal({ reason: err instanceof Error ? err.message : 'error desconocido' }, 'no se pudo crear la aplicación');
+  process.exit(1);
+}
+
 const server = serve({ fetch: app.fetch, port: env.PORT }, (info) => {
   logger.info({ port: info.port, mode: env.DATA_MODE }, 'server listening');
 });

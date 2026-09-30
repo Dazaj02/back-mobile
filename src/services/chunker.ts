@@ -7,12 +7,32 @@ export const MAX_DOSES = 20;
 
 const round1 = (n: number) => Math.round(n * 10) / 10;
 
+/** El contrato limita cada dosis a 20000 caracteres; una "oración" mayor se parte por palabras. */
+const MAX_UNIT_CHARS = 12000;
+
+function splitByChars(sentence: string): string[] {
+  if (sentence.length <= MAX_UNIT_CHARS) return [sentence];
+  const out: string[] = [];
+  let buf = '';
+  for (const word of sentence.split(' ')) {
+    if (buf && buf.length + word.length + 1 > MAX_UNIT_CHARS) {
+      out.push(buf);
+      buf = word;
+    } else {
+      buf = buf ? `${buf} ${word}` : word;
+    }
+  }
+  if (buf) out.push(buf);
+  return out;
+}
+
 /** Parte un párrafo en oraciones (., !, ?, … seguidos de espacio). */
 function splitSentences(paragraph: string): string[] {
   return paragraph
     .split(/(?<=[.!?…])\s+/)
     .map((s) => s.trim())
-    .filter(Boolean);
+    .filter(Boolean)
+    .flatMap(splitByChars);
 }
 
 /**
@@ -28,7 +48,7 @@ export function chunkText(input: string, targetDoseMinutes: number, wordsPerMinu
   const units: string[] = [];
   for (const paragraph of normalizeText(input).split('\n\n')) {
     if (!paragraph) continue;
-    if (countWords(paragraph) > maxParagraph) units.push(...splitSentences(paragraph));
+    if (countWords(paragraph) > maxParagraph || paragraph.length > MAX_UNIT_CHARS) units.push(...splitSentences(paragraph));
     else units.push(paragraph);
   }
 
@@ -68,6 +88,7 @@ export function chunkText(input: string, targetDoseMinutes: number, wordsPerMinu
   return groups.map((g) => ({
     content: g.text,
     words: g.words,
-    estMinutes: round1(g.words / wordsPerMinute),
+    // El contrato exige estMinutes > 0: un fragmento diminuto no puede redondear a 0.
+    estMinutes: Math.max(0.1, round1(g.words / wordsPerMinute)),
   }));
 }

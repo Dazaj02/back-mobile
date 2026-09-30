@@ -8,7 +8,7 @@ const ISSUER = 'https://test.supabase.co/auth/v1';
 const USER = '22222222-2222-4222-8222-222222222222';
 const baseEnv = {
   NODE_ENV: 'test',
-  DATA_MODE: 'live',
+  DATA_MODE: 'memory',
   SUPABASE_URL: 'https://test.supabase.co',
   SUPABASE_SERVICE_ROLE_KEY: 's',
   DEFAULT_AI_PROVIDER: 'deepseek',
@@ -34,10 +34,10 @@ async function sign(
   if (o.sub !== null) jwt.setSubject(o.sub ?? USER);
   return jwt.sign(o.key ?? privateKey);
 }
-const get = (a: typeof app, token?: string, path = '/v1/x') =>
+const get = (a: typeof app, token?: string, path = '/v1/usage') =>
   a.request(path, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
-// Sin ruta real aún: 404 significa "pasó la autenticación".
-const PASSED = 404;
+// /v1/usage es una ruta real: 200 significa "pasó la autenticación".
+const PASSED = 200;
 
 beforeAll(async () => {
   const pair = await generateKeyPair('ES256');
@@ -127,13 +127,13 @@ describe('rate limit', () => {
     const a = createApp(devEnv, logger);
     const ip = { 'x-forwarded-for': '9.9.9.9' };
     for (let i = 0; i < 60; i++) {
-      const r = await a.request('/v1/x', { headers: ip });
+      const r = await a.request('/v1/usage', { headers: ip });
       expect(r.status).toBe(401);
     }
-    const res = await a.request('/v1/x', { headers: ip });
+    const res = await a.request('/v1/usage', { headers: ip });
     expect(res.status).toBe(429);
     expect(res.headers.get('retry-after')).toBeTruthy();
     // otra IP sigue pasando
-    expect((await a.request('/v1/x', { headers: { 'x-forwarded-for': '8.8.8.8' } })).status).toBe(401);
+    expect((await a.request('/v1/usage', { headers: { 'x-forwarded-for': '8.8.8.8' } })).status).toBe(401);
   });
 });
