@@ -20,7 +20,7 @@ Otros scripts: `npm run typecheck` · `npm test` · `npm run lint` · `npm run b
 ### Modos de datos
 - `DATA_MODE=memory` (actual): artículos y cuota en memoria, se pierden al reiniciar. Con `NODE_ENV=development`
   y `DEV_AUTH_BYPASS=true` se acepta `Authorization: Bearer dev-<uuid>`.
-- `DATA_MODE=live`: Supabase real (fase B6, pendiente). Exige `SUPABASE_URL` y `SUPABASE_SERVICE_ROLE_KEY`.
+- `DATA_MODE=live`: Supabase real (B6, verificado). `npm run verify:live` ejecuta 25 comprobaciones contra el proyecto dev (crea y borra usuarios de prueba). Exige `SUPABASE_URL` y `SUPABASE_SERVICE_ROLE_KEY`.
 
 ## Variables de entorno
 Ver `.env.example` (comentado). Se validan al arrancar con zod; si algo falta el proceso termina con un mensaje

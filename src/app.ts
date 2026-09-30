@@ -35,7 +35,7 @@ export type AppDeps = AuthOptions & {
 export function createApp(env: Env, logger: Logger, deps: AppDeps = {}) {
   const app = new Hono<{ Variables: AppVariables }>();
   const now = deps.now ?? Date.now;
-  const repos = deps.repos ?? createRepositories(env, deps.now);
+  const repos = deps.repos ?? createRepositories(env, { logger, now: deps.now });
   const registry = deps.registry ?? createRegistry(env, deps.adapters);
 
   app.use(requestId);
