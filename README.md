@@ -74,7 +74,8 @@ Toda respuesta incluye `X-Request-Id`.
 - **Despliegue**: ver `DEPLOY.md` (comparativa de hostings y pasos para Render).
 - **Rate limit en memoria** (por usuario y por IP): válido **solo con una instancia** del servidor. Con varias
   instancias cada una tendría su propio contador.
-- **IP del cliente**: último valor de `X-Forwarded-For` (lo añade el proxy más cercano) o la IP del socket.
+- **IP del cliente**: `CF-Connecting-IP` (Cloudflare, que usa Render); si no existe, el último valor de
+  `X-Forwarded-For`, o la IP del socket.
 - **Timeouts**: 90 s globales por petición; la IA tiene 60 s por llamada (`AI_TIMEOUT_MS`) y 80 s en total entre la
   llamada y su reintento.
 - **Textos largos**: un artículo de URL de más de `MAX_TEXT_CHARS` (50 000) se recorta en el último párrafo (y a 20
