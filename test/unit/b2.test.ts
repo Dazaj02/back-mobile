@@ -136,4 +136,14 @@ describe('rate limit', () => {
     // otra IP sigue pasando
     expect((await a.request('/v1/usage', { headers: { 'x-forwarded-for': '8.8.8.8' } })).status).toBe(401);
   });
+  it('detrás de Cloudflare: usa CF-Connecting-IP aunque X-Forwarded-For cambie en cada petición', async () => {
+    const a = createApp(devEnv, logger);
+    for (let i = 0; i < 60; i++) {
+      const r = await a.request('/v1/usage', { headers: { 'cf-connecting-ip': '7.7.7.7', 'x-forwarded-for': `10.0.0.${i}, 172.70.0.${i}` } });
+      expect(r.status).toBe(401);
+    }
+    const res = await a.request('/v1/usage', { headers: { 'cf-connecting-ip': '7.7.7.7', 'x-forwarded-for': '10.9.9.9, 172.70.9.9' } });
+    expect(res.status).toBe(429);
+    expect((await a.request('/v1/usage', { headers: { 'cf-connecting-ip': '6.6.6.6' } })).status).toBe(401);
+  });
 });

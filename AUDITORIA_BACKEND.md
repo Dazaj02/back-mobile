@@ -1,0 +1,49 @@
+# Auditoría final del backend (checklist §12 del plan)
+
+- **Fecha:** 2026-10-01 · **Commit auditado:** ver `git log` (rama `rediseno`) · **Despliegue:** https://focusread-api.onrender.com
+- **Tipo:** autoauditoría del agente backend, con evidencia `archivo:línea`. No sustituye una revisión independiente
+  (Gemini): está pensada para dársela como punto de partida. Las líneas son las del commit auditado.
+- **Estado de las comprobaciones automáticas:** `npm run typecheck` ✅ · `npm test` ✅ 186/186 · `npm run lint` ✅ ·
+  `npm audit` ✅ 0 vulnerabilidades · `npm run verify:live` ✅ 25/25 (contra Supabase dev) · producción verificada de extremo a extremo.
+
+## Resultado
+
+| # | Ítem | Veredicto | Evidencia |
+|---|---|---|---|
+| B-A1 | Cero secretos en el repo; `.env` ignorado; `.env.example` sin valores | **Cumple** | `git ls-files` solo lista `.env.example`; `.gitignore:13-15` (`.env`, `.env.*`, `!.env.example`); `git grep` de `sk-…`, `sb_secret_…` y JWT: sin resultados fuera de menciones en texto; `git log --all -S<service_role>` = 0 commits. Incidente P13: la key se pegó una vez en `.env.example` y se retiró **antes** de cualquier commit |
+| B-A2 | Validación del entorno al arrancar; producción prohíbe `memory` y el bypass | **Cumple** | `src/config/env.ts:54-56` (prohíbe `memory` y `DEV_AUTH_BYPASS` en production), `:50-52` (`live` exige Supabase), `:58-59` (key del proveedor por defecto), `:64-70` y `:72-83` (mensajes sin valores); `src/index.ts:8-12` (sale con código 1). Tests: `test/unit/b0.test.ts:32` y `:21-30`; comprobado arrancando `dist/` con bypass=true |
+| B-A3 | JWT verificado con JWKS (`issuer`, `audience`, `role`), sin bypass en producción | **Cumple** | `src/middleware/auth.ts:20` (`createRemoteJWKSet`), `:39-43` (`jwtVerify` con issuer, audience y `ALLOWED_ALGS` asimétricos `:10`), `:45` (`sub` uuid y `role==='authenticated'`), `:47-49` (error sin detalle), `:18` y `:29-34` (bypass solo con `development`+flag). Tests: `test/unit/b2.test.ts:51-95` (válido, expirado, issuer, audience, otra llave, sin token, `role`, bypass) y producción real: `verify-live.ts:91` |
+| B-A4 | `X-AI-Key` nunca se registra, guarda ni devuelve | **Cumple** | Redacción `src/middleware/logger.ts:9-18`; el log HTTP no incluye bodies (`:26-46`); errores del SDK convertidos sin copiar el mensaje `src/services/ai/errors.ts:7-19`; solo frames del stack `src/middleware/errorHandler.ts:11-16` y `:36`; `process.on('uncaughtException')` registra solo el nombre `src/index.ts:46-52`; la key solo vive en `ResolvedProvider` durante la petición `src/services/ai/registry.ts:9-15` y `:25-49`. Tests: `test/integration/security.test.ts:73` (trace, 5 escenarios, eco de la key en el error del proveedor), `test/unit/providers.test.ts:61`, `test/unit/b0.test.ts:81`; humo con servidor real y `LOG_LEVEL=debug`: 0 apariciones |
+| B-A5 | `service_role` solo en `repositories/supabase` y **toda** consulta filtra por `user_id` | **Cumple** | `grep` de `createClient|SERVICE_ROLE|.from(` en `src/`: solo `src/repositories/supabase/index.ts:76` (cliente, creado una vez) y su única consulta a tablas `:113-116` (`.eq('id')` + `.eq('user_id')`); las RPC reciben `p_user_id` (`:89`, `:96`, `:105`). Tests: `test/unit/supabaseRepo.test.ts:82`; `verify-live.ts:139-143`. *Nota:* `scripts/verify-live.ts` usa `service_role` para comprobar filas ajenas; es una herramienta local que no se despliega (`.dockerignore`) |
+| B-A6 | Anti-SSRF completo (validación al conectar, redirecciones revalidadas, límites) | **Cumple** | `src/services/extract/ssrfGuard.ts:12-23` (solo rango `unicast`; IPv4 mapeada), `:29-43` (esquema, credenciales, puerto, localhost, IP literal), `:62-77` (`lookup` que rechaza si **alguna** dirección es no pública); `fetchUrl.ts:23` (Agent con lookup seguro), `:18` y `:90-101` (≤3 redirecciones, `validateUrl` en cada salto), `:39-50` (límite de bytes en cabecera y streaming), `:112-116` (solo html/plain), `:79` (timeout). Tests: `test/unit/extract.test.ts:24-60` (24 URLs bloqueadas), `:96` (Agent real + DNS privado), `:112` (redirección a IP privada), `:135` (tamaño), `:142` (PDF) |
+| B-A7 | La IA no genera contenido: el texto de las dosis sale del fragmentador | **Cumple** | `src/services/pipeline.ts:76` (`chunkTextDetailed`) y `:104` (`content: c.content`); el esquema de la IA no tiene campo de contenido y descarta los extra `src/services/ai/enrichment.ts:15-20`. Test: `test/unit/enrichment.test.ts:99` y `test/integration/api.test.ts:103` (el texto guardado = texto de entrada) |
+| B-A8 | Salida de la IA validada con zod, con reparación y degradación | **Cumple** | `enrichment.ts:15-20` (esquema), `:39-48` (validación y nº de dosis), `:92-100` (un reintento de reparación y degradación), `:51-58` (degradación). Tests: `test/unit/enrichment.test.ts:52` (JSON roto), `:60` (nº de dosis), `:67` (dos fallos), `test/integration/api.test.ts:190` (warnings + devolución de cuota) |
+| B-A9 | Prompt con contenido delimitado y tratado como dato | **Cumple** | `src/services/ai/prompt.ts:2` (instrucción del sistema), `:7-9` (`neutralize` quita etiquetas inyectadas), `:34-35` (`<documento>` / `<fragmento n>`); temperatura 0.3 y modo JSON `openaiCompatible.ts:41` con reintento sin él `:49`. Test: `enrichment.test.ts` (`buildMessages`) |
+| B-A10 | Lista blanca de proveedores y modelos; el usuario no puede enviar URLs base | **Cumple** (con salvedad) | `src/config/providers.ts:23-` (URLs base fijas y modelos por proveedor); `registry.ts:39-45` (key obligatoria y válida, modelo en la lista); el contrato solo admite `ProviderId` y `model` (`contract.ts:79-85`). Tests: `providers.test.ts:126-141`. *Salvedad:* los IDs de OpenAI y OpenRouter no están verificados contra su documentación (P5/P7); no se usan hoy |
+| B-A11 | Rate limit por usuario y por IP; cuota atómica con refund en fallos y degradación | **Parcial** | Límites: `src/middleware/rateLimit.ts:6-60`, montados en `src/app.ts:61-63` (IP 60/min antes de auth; usuario después). Cuota: `src/services/pipeline.ts:40-52` (consume), `:90` (refund si degrada), `:115-117` (refund ante cualquier error); atómica en BD (`consume_ai_quota`) verificada en vivo: `verify-live.ts:129`. Tests: `b2.test.ts:104,126`, `api.test.ts:149,168,190`. **Parcial porque:** (1) la fuente de la IP detrás de Cloudflare + Render **no está verificada** (usamos el último valor de `X-Forwarded-For`, `rateLimit.ts:51`); si fuera la IP del proxy, el límite por IP sería global (60/min para todos). (2) `GET /v1/usage` en live usa un apaño no atómico hasta tener una función de lectura (D14/P10) |
+| B-A12 | Guardado atómico con una sola RPC | **Cumple** | `src/repositories/supabase/index.ts:102-107` (una sola `rpc('save_processed_article')`). Tests: `supabaseRepo.test.ts:68`; en vivo: `verify-live.ts:111-124` (guardado forzado a fallar → error `23502` y 0 filas parciales) |
+| B-A13 | Errores con formato del contrato, sin stack, SQL ni datos del proveedor | **Cumple** | `src/middleware/errorHandler.ts:18-45` (todo → `{error:{code,message,requestId}}`; desconocidos → `INTERNAL` genérico), `src/lib/errors.ts` (mapa §3.3), `repositories/supabase/index.ts:82-86` (`fail`: se registra, no se devuelve). Tests: `security.test.ts:99` (BD), `:113` (8 escenarios), `:138` (producción con JWT real) |
+| B-A14 | Límites de body, texto, tamaño de descarga y timeouts configurados | **Cumple** | `src/app.ts:44-52` (`bodyLimit` y timeout global 90 s); `src/config/env.ts:40-46` (texto, timeouts, `URL_MAX_BYTES`, body); `pipeline.ts:26,87` (plazo total de IA 80 s); `fetchUrl.ts:79`. Tests: `b0.test.ts:70`, `security.test.ts:221` |
+| B-A15 | Contrato copiado literal (sin divergencias frente a §3.1) | **Cumple** | Comparación por script de las 142 líneas del bloque de `PLAN_BACKEND.md` §3.1 contra `src/contract/contract.ts`: **idénticas** |
+| B-A16 | `npm audit` sin vulnerabilidades altas ni críticas | **Cumple** | `npm audit` → `found 0 vulnerabilities` (incluida la comprobación `--omit=dev --audit-level=high`) |
+
+**Resumen:** 15 Cumple · 1 Parcial · 0 No cumple.
+
+## Hallazgos adicionales (fuera de la checklist)
+
+| # | Hallazgo | Riesgo | Acción propuesta |
+|---|---|---|---|
+| H1 | **IP del cliente detrás de Cloudflare/Render sin verificar** (ver B-A11). | Medio: un límite por IP "global" podría bloquear a usuarios legítimos con muchos usuarios | Probar con dos redes (Wi-Fi y datos móviles): enviar 61 peticiones sin token desde una y comprobar que la otra no recibe 429; si recibe, cambiar la fuente de IP |
+| H2 | Apagado ordenado (SIGTERM) implementado (`src/index.ts:34-43`) pero **no probado** en Linux/Render. | Bajo | *Manual Deploy → Restart* en Render y buscar `shutting down` |
+| H3 | `usage()` en live es un apaño (D14/P10). | Bajo | Que el agente de BD cree `get_ai_quota_usage` |
+| H4 | La `service_role` es una key *legacy* y se pegó una vez en un archivo versionado (nunca commiteado). | Bajo | Rotarla (opcional pero recomendado) |
+| H5 | El rate limit en memoria exige **una instancia** (documentado en README; Render gratis solo permite una). | Aceptado | — |
+| H6 | El recorte de artículos largos por URL es silencioso (el contrato no admite un warning nuevo). | Bajo | Decisión de David (C1) |
+| H7 | Pruebas de proveedores solo contra DeepSeek real; Gemini/OpenAI/Groq/OpenRouter solo con simulaciones. | Bajo (no se usan) | Probar antes de habilitarlos |
+
+## Cómo reproducir las verificaciones
+```bash
+npm run typecheck && npm test && npm run lint && npm audit
+npm run verify:live          # contra Supabase dev: JWT real, atomicidad, cuota 10/11, aislamiento, borrado
+curl https://focusread-api.onrender.com/health
+```

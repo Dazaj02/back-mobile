@@ -45,10 +45,14 @@ export function createRateLimiter(opts: {
 }
 
 /**
- * IP del cliente: el último valor de X-Forwarded-For (lo añade el proxy más
- * cercano y no es falsificable por el cliente); si no hay proxy, la dirección del socket.
+ * IP del cliente: CF-Connecting-IP si existe (Cloudflare); si no, el último valor de
+ * X-Forwarded-For (lo añade el proxy más cercano); si no hay proxy, la dirección del socket.
  */
 export function clientIp(c: Context<Env>): string {
+  // Detrás de Cloudflare (Render) hay varios proxies y el último valor de X-Forwarded-For cambia entre peticiones.
+  // CF-Connecting-IP lo fija Cloudflare con la IP real del cliente (sobrescribe lo que envíe el cliente).
+  const cf = c.req.header('cf-connecting-ip')?.trim();
+  if (cf) return cf;
   const xff = c.req.header('x-forwarded-for');
   const last = xff?.split(',').at(-1)?.trim();
   if (last) return last;
